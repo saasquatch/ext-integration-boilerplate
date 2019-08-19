@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.time.Instant;
 
+import javax.annotation.Nullable;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -16,6 +18,7 @@ import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.KeyLengthException;
 import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -91,6 +94,31 @@ public class EIAuth {
 			throw new RuntimeException(e);
 		}
 		return Pair.of(true, segmentJwt.serialize());
+	}
+
+	/**
+	 * Verify an access key coming from the 3rd party service
+	 * @return optional error message
+	 */
+	@Nullable
+	public static String verifyAccessKey(String clientSecret, @Nullable String accessKey) {
+		final SignedJWT signedJWT;
+		try {
+			signedJWT = SignedJWT.parse(accessKey);
+		} catch (ParseException e) {
+			return "Invalid JWT";
+		}
+		final boolean verifyResult;
+		try {
+			final JWSVerifier verifier = new MACVerifier(clientSecret);
+			verifyResult = signedJWT.verify(verifier);
+		} catch (JOSEException e) {
+			throw new RuntimeException(e);
+		}
+		if (!verifyResult) {
+			return "Invalid JWT signature";
+		}
+		return null;
 	}
 
 }
