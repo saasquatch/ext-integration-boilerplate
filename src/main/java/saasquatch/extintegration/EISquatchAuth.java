@@ -98,7 +98,7 @@ public class EISquatchAuth {
 		final String protocol = https ? "https://" : "http://";
 		try {
 			return JWKSet.load(new URL(protocol + getAppDomain()
-					+ "/.well-known/jwks.json"));
+					+ "/.well-known/jwks.json"), 2500, 5000, 0);
 		} catch (IOException | ParseException e) {
 			throw new RuntimeException();
 		}
