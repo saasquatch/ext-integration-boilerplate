@@ -1,6 +1,7 @@
 package saasquatch.extintegration;
 
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import javax.annotation.Nonnull;
 
@@ -11,10 +12,15 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.ValueNode;
+import com.google.common.base.Suppliers;
 
 public class EIJson {
 
-	public static final ObjectMapper MAPPER = newDefaultMapper();
+	private static final Supplier<ObjectMapper> MAPPER = Suppliers.memoize(EIJson::newDefaultMapper);
+
+	public static final ObjectMapper mapper() {
+		return MAPPER.get();
+	}
 
 	public static ObjectMapper newDefaultMapper() {
 		final ObjectMapper mapper = new ObjectMapper();
@@ -35,7 +41,7 @@ public class EIJson {
 		if (json.isMissingNode()) {
 			return json;
 		} else if (json.isArray()) {
-			final ArrayNode newNode = MAPPER.createArrayNode();
+			final ArrayNode newNode = JsonNodeFactory.instance.arrayNode();
 			for (JsonNode v : json) {
 				newNode.add(mutateValueNodes(v, mutation));
 			}
@@ -43,7 +49,7 @@ public class EIJson {
 		} else if (json.isValueNode()) {
 			return mutation.apply((ValueNode) json);
 		} else {
-			final ObjectNode newNode = MAPPER.createObjectNode();
+			final ObjectNode newNode = JsonNodeFactory.instance.objectNode();
 			json.fields().forEachRemaining(e -> {
 				final String k = e.getKey();
 				final JsonNode v = e.getValue();
