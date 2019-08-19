@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.google.common.io.ByteStreams;
 import com.google.common.net.HttpHeaders;
+import com.google.common.net.MediaType;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -116,7 +117,7 @@ public class EISquatchAuth {
 			conn.setConnectTimeout(2500);
 			conn.setReadTimeout(5000);
 			conn.setRequestMethod("POST");
-			conn.setRequestProperty(HttpHeaders.CONTENT_TYPE, "application/json");
+			conn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.JSON_UTF_8.toString());
 			conn.setDoOutput(true);
 			try (OutputStream connOut = conn.getOutputStream()) {
 				connOut.write(EIJson.mapper().writeValueAsBytes(bodyJson));
