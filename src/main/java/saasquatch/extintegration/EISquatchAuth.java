@@ -87,7 +87,7 @@ public class EISquatchAuth {
 	/**
 	 * @see EIAuth#getAccessKey(JWKSet, String, String)
 	 */
-	public Pair<Boolean, String> getIntegrationAccessKey(String tenantScopedToken, String jwtIssuer) {
+	public Pair<Boolean, String> getIntegrationAccessKey(String jwtIssuer, String tenantScopedToken) {
 		return EIAuth.getAccessKey(getCachedSquatchJwks(), getClientSecret(), jwtIssuer, tenantScopedToken);
 	}
 
