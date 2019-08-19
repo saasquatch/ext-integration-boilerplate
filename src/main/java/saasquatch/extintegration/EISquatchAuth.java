@@ -140,7 +140,7 @@ public class EISquatchAuth {
 			try (InputStream connIn = conn.getInputStream()) {
 				respJson = EIJson.mapper().readTree(connIn);
 			}
-			final String accessToken = respJson.path("access_token").asText("");
+			final String accessToken = respJson.path("access_token").textValue();
 			if (StringUtils.isBlank(accessToken)) {
 				throw new RuntimeException("access_token is blank");
 			}
