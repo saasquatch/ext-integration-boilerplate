@@ -18,6 +18,7 @@ import javax.annotation.Nullable;
 
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -81,6 +82,20 @@ public class EISquatchAuth {
 
 	public String getClientSecret() {
 		return clientSecret;
+	}
+
+	/**
+	 * @see EIAuth#getAccessKey(JWKSet, String, String)
+	 */
+	public Pair<Boolean, String> getIntegrationAccessKey(String tenantScopedToken) {
+		return EIAuth.getAccessKey(getCachedSquatchJwks(), getClientSecret(), tenantScopedToken);
+	}
+
+	/**
+	 * @see EIAuth#verifyAccessKey(String, String)
+	 */
+	public String verifyIntegrationAccessKey(String accessKey) {
+		return EIAuth.verifyAccessKey(getClientSecret(), accessKey);
 	}
 
 	/**
