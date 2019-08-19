@@ -3,6 +3,7 @@ package saasquatch.extintegration;
 import java.io.IOException;
 import java.text.ParseException;
 import java.time.Instant;
+import java.util.Base64;
 
 import javax.annotation.Nullable;
 
@@ -114,6 +115,43 @@ public class EIAuth {
 			verifyResult = signedJWT.verify(verifier);
 		} catch (JOSEException e) {
 			throw new RuntimeException(e);
+		}
+		if (!verifyResult) {
+			return "Invalid JWT signature";
+		}
+		return null;
+	}
+
+	/**
+	 * Validate a SaaSquatch webhook
+	 * @return optional error message
+	 */
+	@Nullable
+	public static String validateSquatchWebhook(JWKSet squatchJwks, String sigHeader, byte[] bodyBytes) {
+		if (StringUtils.isBlank(sigHeader)) return "signature missing";
+		final String jwtStr = StringUtils.replaceOnce(sigHeader, "..",
+				'.' + Base64.getUrlEncoder().withoutPadding().encodeToString(bodyBytes) + '.');
+		final SignedJWT signedJWT;
+		try {
+			signedJWT = SignedJWT.parse(jwtStr);
+		} catch (ParseException e) {
+			return "Invalid JWT";
+		}
+		final RSAKey jwk = (RSAKey) squatchJwks.getKeyByKeyId(signedJWT.getHeader().getKeyID());
+		if (jwk == null) {
+			return "jwk not found for kid";
+		}
+		final JWSVerifier verifier;
+		try {
+			verifier = new RSASSAVerifier(jwk);
+		} catch (JOSEException e) {
+			throw new RuntimeException(e); // internal error
+		}
+		final boolean verifyResult;
+		try {
+			verifyResult = signedJWT.verify(verifier);
+		} catch (JOSEException e) {
+			throw new RuntimeException(e); // internal error
 		}
 		if (!verifyResult) {
 			return "Invalid JWT signature";
