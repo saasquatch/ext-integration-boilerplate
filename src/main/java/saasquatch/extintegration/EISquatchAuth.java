@@ -103,7 +103,7 @@ public class EISquatchAuth {
 	 * @return optional error message
 	 */
 	@Nullable
-	public String validateSquatchWebhook(JWKSet squatchJwks, String sigHeader, byte[] bodyBytes) {
+	public String validateSquatchWebhook(String sigHeader, byte[] bodyBytes) {
 		if (StringUtils.isBlank(sigHeader)) return "signature missing";
 		final String jwtStr = StringUtils.replaceOnce(sigHeader, "..",
 				'.' + Base64.getUrlEncoder().withoutPadding().encodeToString(bodyBytes) + '.');
@@ -113,7 +113,8 @@ public class EISquatchAuth {
 		} catch (ParseException e) {
 			return "Invalid JWT";
 		}
-		final RSAKey jwk = (RSAKey) squatchJwks.getKeyByKeyId(signedJWT.getHeader().getKeyID());
+		final RSAKey jwk = (RSAKey) getCachedSquatchJwks()
+				.getKeyByKeyId(signedJWT.getHeader().getKeyID());
 		if (jwk == null) {
 			return "jwk not found for kid";
 		}
