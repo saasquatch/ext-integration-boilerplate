@@ -33,7 +33,7 @@ public class EIAuth {
 	 * @return Pair of (false, errorMessage) or (true, signedJwt)
 	 */
 	public static Pair<Boolean, String> getAccessKey(JWKSet squatchJwks, String clientSecret,
-			String tenantScopedToken) {
+			String jwtIssuer, String tenantScopedToken) {
 		final SignedJWT squatchJwt;
 		try {
 			squatchJwt = SignedJWT.parse(tenantScopedToken);
@@ -85,7 +85,7 @@ public class EIAuth {
 				.type(JOSEObjectType.JWT)
 				.build(),
 				new JWTClaimsSet.Builder()
-				.issuer("https://segment.referralsaasquatch.com/")
+				.issuer(jwtIssuer)
 				.claim("sub", tenantAlias + "@tenants")
 				.build());
 		try {
