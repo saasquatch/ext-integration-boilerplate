@@ -21,16 +21,8 @@ public class EIIOBundle implements Closeable {
 		this.httpAsyncClient = EIApacheHcUtil.newAsyncClient();
 	}
 
-	public Executor getExecutor() {
-		return executor;
-	}
-
-	public CloseableHttpClient getHttpClient() {
-		return httpClient;
-	}
-
-	public CloseableHttpAsyncClient getHttpAsyncClient() {
-		return httpAsyncClient;
+	public void start() {
+		httpAsyncClient.start();
 	}
 
 	@Override
@@ -43,6 +35,18 @@ public class EIIOBundle implements Closeable {
 		} catch (Exception e) {
 			logger.warn("Exception encountered in close()", e);
 		}
+	}
+
+	public Executor getExecutor() {
+		return executor;
+	}
+
+	public CloseableHttpClient getHttpClient() {
+		return httpClient;
+	}
+
+	public CloseableHttpAsyncClient getHttpAsyncClient() {
+		return httpAsyncClient;
 	}
 
 }
