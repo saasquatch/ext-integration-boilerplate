@@ -3,10 +3,7 @@ package saasquatch.extintegration;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.ParseException;
 import java.util.Base64;
@@ -19,14 +16,17 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.ContentType;
+import org.apache.http.util.EntityUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
-import com.google.common.io.ByteStreams;
-import com.google.common.net.HttpHeaders;
-import com.google.common.net.MediaType;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -36,10 +36,11 @@ import com.nimbusds.jwt.SignedJWT;
 
 public class EISquatchAuth {
 
+	private final Executor executor;
 	private final LoadingCache<Object, JWKSet> squatchJwksCache;
 	private final LoadingCache<Object, String> accessTokenCache;
 
-	private final Executor executor;
+	private final EIIOBundle ioBundle;
 	private final boolean https;
 	private final String appDomain;
 	private final String clientId;
@@ -47,9 +48,9 @@ public class EISquatchAuth {
 	private final String jwtAudience;
 	private final String jwtTokenUrl;
 
-	public EISquatchAuth(Executor executor, boolean https, String appDomain,
+	public EISquatchAuth(EIIOBundle ioBundle, boolean https, String appDomain,
 			String clientId, String clientSecret, String jwtAudience, String jwtTokenUrl) {
-		this.executor = executor;
+		this.ioBundle = ioBundle;
 		this.https = https;
 		this.appDomain = appDomain;
 		this.clientId = clientId;
@@ -57,6 +58,7 @@ public class EISquatchAuth {
 		this.jwtAudience = jwtAudience;
 		this.jwtTokenUrl = jwtTokenUrl;
 
+		this.executor = ioBundle.getExecutor();
 		this.squatchJwksCache = Caffeine.newBuilder()
 				.refreshAfterWrite(1, TimeUnit.DAYS)
 				.executor(this.executor)
@@ -157,39 +159,28 @@ public class EISquatchAuth {
 				.put("audience", jwtAudience)
 				.put("grant_type", "client_credentials");
 		try {
-			final HttpURLConnection conn = (HttpURLConnection) new URL(jwtTokenUrl).openConnection();
-			conn.setInstanceFollowRedirects(true);
-			conn.setConnectTimeout(2500);
-			conn.setReadTimeout(5000);
-			conn.setRequestMethod("POST");
-			conn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.JSON_UTF_8.toString());
-			conn.setDoOutput(true);
-			try (OutputStream connOut = conn.getOutputStream()) {
-				connOut.write(EIJson.mapper().writeValueAsBytes(bodyJson));
-			}
-			final int status = conn.getResponseCode();
-			if (status >= 300) {
-				final String respBody;
-				try (InputStream connErr = conn.getErrorStream()) {
-					if (connErr == null) {
-						respBody = null;
-					} else {
-						respBody = new String(ByteStreams.toByteArray(connErr), UTF_8);
-					}
+			final HttpPost request = new HttpPost(jwtTokenUrl);
+			request.setConfig(RequestConfig.custom()
+					.setConnectTimeout(2500)
+					.setSocketTimeout(5000)
+					.build());
+			request.setEntity(new ByteArrayEntity(EIJson.mapper().writeValueAsBytes(bodyJson),
+					ContentType.APPLICATION_JSON));
+			try (CloseableHttpResponse resp = ioBundle.getHttpClient().execute(request)) {
+				final int status = resp.getStatusLine().getStatusCode();
+				final String respBody = EntityUtils.toString(resp.getEntity(), UTF_8);
+				if (status >= 300) {
+					throw new IllegalStateException(String.format(
+							"status[%s] received from [%s]. Response body: %s",
+							status, jwtTokenUrl, respBody));
 				}
-				throw new IllegalStateException(String.format(
-						"status[%s] received from [%s]. Response body: %s",
-						status, jwtTokenUrl, respBody));
+				final JsonNode respJson = EIJson.mapper().readTree(respBody);
+				final String accessToken = respJson.path("access_token").textValue();
+				if (StringUtils.isBlank(accessToken)) {
+					throw new RuntimeException("access_token is blank");
+				}
+				return accessToken;
 			}
-			final JsonNode respJson;
-			try (InputStream connIn = conn.getInputStream()) {
-				respJson = EIJson.mapper().readTree(connIn);
-			}
-			final String accessToken = respJson.path("access_token").textValue();
-			if (StringUtils.isBlank(accessToken)) {
-				throw new RuntimeException("access_token is blank");
-			}
-			return accessToken;
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
