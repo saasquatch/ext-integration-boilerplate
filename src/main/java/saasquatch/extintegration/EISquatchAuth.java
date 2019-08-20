@@ -67,7 +67,7 @@ public class EISquatchAuth {
 				.build(ignored -> loadAccessToken());
 	}
 
-	public void preLoadCache() {
+	public void init() {
 		Stream.of(squatchJwksCache, accessTokenCache)
 				.forEach(cache -> cache.get(ObjectUtils.NULL));
 	}
