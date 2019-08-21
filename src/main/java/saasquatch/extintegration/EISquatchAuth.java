@@ -250,8 +250,13 @@ public class EISquatchAuth {
 
 	public CompletionStage<JsonNode> getCachedIntegrationConfig(String tenantAlias) {
 		return getCachedIntegration(tenantAlias)
-		.thenApplyAsync(c -> {
-			return Optional.ofNullable(c)
+		.thenApplyAsync(integration -> {
+			if (integration == null) return null;
+			if (!integration.path("enabled").asBoolean(false)) return null;
+			return integration.get("config");
+		}, executor)
+		.thenApplyAsync(integration -> {
+			return Optional.ofNullable(integration)
 					.orElseGet(JsonNodeFactory.instance::objectNode);
 		}, executor);
 	}
