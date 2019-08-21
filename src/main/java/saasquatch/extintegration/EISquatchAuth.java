@@ -1,12 +1,16 @@
 package saasquatch.extintegration;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static saasquatch.extintegration.EIUtil.urlEnc;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URL;
 import java.text.ParseException;
 import java.util.Base64;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -16,8 +20,11 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
@@ -25,8 +32,10 @@ import org.apache.http.util.EntityUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.google.common.net.HttpHeaders;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -39,6 +48,8 @@ public class EISquatchAuth {
 	private final Executor executor;
 	private final LoadingCache<Object, JWKSet> squatchJwksCache;
 	private final LoadingCache<Object, String> accessTokenCache;
+	// tenantAlias -> segment integration
+	private final AsyncLoadingCache<String, JsonNode> integrationInstanceCache;
 
 	private final EIIOBundle ioBundle;
 	private final boolean https;
@@ -67,6 +78,15 @@ public class EISquatchAuth {
 				.refreshAfterWrite(6, TimeUnit.HOURS)
 				.executor(this.executor)
 				.build(ignored -> loadAccessToken());
+		this.integrationInstanceCache =
+				Caffeine.newBuilder()
+				.maximumSize(16)
+				.expireAfterWrite(1, TimeUnit.MINUTES)
+				.executor(this.executor)
+				.buildAsync((tenantAlias, _executor) -> {
+					return loadIntegration(tenantAlias)
+							.toCompletableFuture();
+				});
 	}
 
 	public void init() {
@@ -188,6 +208,52 @@ public class EISquatchAuth {
 
 	public String getCachedAccessToken() {
 		return accessTokenCache.get(ObjectUtils.NULL);
+	}
+
+	public String getAuthHeader() {
+		return "Bearer " + getCachedAccessToken();
+	}
+
+	public CompletionStage<JsonNode> loadIntegration(String tenantAlias) {
+		final String url = String.format("https://%s/api/v1/%s/integration/%s",
+				getAppDomain(), tenantAlias, urlEnc(getClientId()));
+		final HttpGet request = new HttpGet(url);
+		request.setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING);
+		request.setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader());
+		final CompletableFuture<HttpResponse> respPromise = new CompletableFuture<>();
+		ioBundle.getHttpAsyncClient().execute(request,
+				EIApacheHcUtil.completableFuture(respPromise));
+		return respPromise.thenApplyAsync(resp -> {
+			final JsonNode respJson;
+			try {
+				final int status = resp.getStatusLine().getStatusCode();
+				if (status < 300) {
+					respJson = EIJson.mapper().readTree(EIApacheHcUtil.getBodyBytes(resp));
+				} else if (status == HttpStatus.SC_NOT_FOUND) {
+					respJson = null;
+				} else {
+					final String respBody = EIApacheHcUtil.getBodyText(resp);
+					throw new RuntimeException(String.format(
+							"status[%s] received from [%s]. Response: %s",
+							status, request.getURI(), respBody));
+				}
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+			return respJson;
+		}, executor);
+	}
+
+	public CompletionStage<JsonNode> getCachedIntegration(String tenantAlias) {
+		return integrationInstanceCache.get(tenantAlias);
+	}
+
+	public CompletionStage<JsonNode> getCachedIntegrationConfig(String tenantAlias) {
+		return getCachedIntegration(tenantAlias)
+		.thenApplyAsync(c -> {
+			return Optional.ofNullable(c)
+					.orElseGet(JsonNodeFactory.instance::objectNode);
+		}, executor);
 	}
 
 }
