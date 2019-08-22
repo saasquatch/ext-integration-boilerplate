@@ -15,6 +15,13 @@
     <jackson.version>2.9.9</jackson.version>
     <jackson.databind.version>2.9.9.3</jackson.databind.version>
   </properties>
+  
+  <repositories>
+    <repository>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
+    </repository>
+  </repositories>
 
   <dependencies>
     <dependency>
@@ -27,6 +34,11 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
       <version>1.7.28</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.saasquatch</groupId>
+      <artifactId>squatch-common</artifactId>
+      <version>bf490d7</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
