@@ -22,11 +22,13 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
 import org.apache.http.util.EntityUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
@@ -229,8 +231,7 @@ public class EISquatchAuth {
           respJson = null;
         } else {
           final String respBody = EIApacheHcUtil.getBodyText(resp);
-          throw new RuntimeException(String.format(
-              "status[%s] received from [%s]. Response: %s",
+          throw new RuntimeException(String.format("status[%s] received from [%s]. Response: %s",
               status, request.getURI(), respBody));
         }
       } catch (IOException e) {
@@ -246,15 +247,62 @@ public class EISquatchAuth {
 
   public CompletionStage<JsonNode> getCachedIntegrationConfig(String tenantAlias) {
     return getCachedIntegration(tenantAlias)
-    .thenApplyAsync(integration -> {
-      if (integration == null) return null;
-      if (!integration.path("enabled").asBoolean(false)) return null;
-      return integration.get("config");
-    }, executor)
-    .thenApplyAsync(integration -> {
-      return Optional.ofNullable(integration)
-          .orElseGet(JsonNodeFactory.instance::objectNode);
-    }, executor);
+        .thenApplyAsync(integration -> {
+          if (integration == null)
+            return null;
+          if (!integration.path("enabled").asBoolean(false))
+            return null;
+          return integration.get("config");
+        }, executor).thenApplyAsync(integration -> {
+          return Optional.ofNullable(integration)
+              .orElseGet(JsonNodeFactory.instance::objectNode);
+        }, executor);
+  }
+
+  public CompletionStage<JsonNode> updateIntegrationConfig(String tenantAlias,
+      JsonNode integrationConfig) {
+    return loadIntegration(tenantAlias)
+        .thenApplyAsync(ObjectNode.class::cast, executor)
+        .thenComposeAsync(integration -> {
+          if (integration == null) {
+            throw new IllegalStateException(
+                String.format("Tenant[%s] does not have an integration", tenantAlias));
+          }
+          integration.set("config", integrationConfig);
+          final HttpPut putReq = new HttpPut(String.format("https://%s/api/v1/%s/integration",
+              getAppDomain(), tenantAlias));
+          putReq.setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING);
+          putReq.setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader());
+          try {
+            putReq.setEntity(new ByteArrayEntity(EIJson.mapper().writeValueAsBytes(integration),
+                ContentType.APPLICATION_JSON));
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+          final CompletableFuture<HttpResponse> respPromise = new CompletableFuture<>();
+          ioBundle.getHttpAsyncClient().execute(putReq,
+              EIApacheHcUtil.completableFuture(respPromise));
+          return respPromise;
+        }, executor)
+        .thenApplyAsync(resp -> {
+          final int status = resp.getStatusLine().getStatusCode();
+          if (status > 299) {
+            final String respBody;
+            try {
+              respBody = EIApacheHcUtil.getBodyText(resp);
+            } catch (IOException e) {
+              throw new UncheckedIOException(e);
+            }
+            throw new RuntimeException(String.format(
+                "status[%s] received when updating integration. Response: %s",
+                status, respBody));
+          }
+          try {
+            return EIJson.mapper().readTree(EIApacheHcUtil.getBodyBytes(resp));
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+        }, executor);
   }
 
 }
