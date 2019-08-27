@@ -82,8 +82,7 @@ public class EISquatchAuth {
         .expireAfterWrite(1, TimeUnit.MINUTES)
         .executor(this.executor)
         .buildAsync((tenantAlias, _executor) -> {
-          return loadIntegration(tenantAlias)
-              .toCompletableFuture();
+          return loadIntegration(tenantAlias).toCompletableFuture();
         });
   }
 
@@ -268,7 +267,15 @@ public class EISquatchAuth {
             throw new IllegalStateException(
                 String.format("Tenant[%s] does not have an integration", tenantAlias));
           }
-          integration.set("config", integrationConfig);
+          final JsonNode originalConfig = Optional.ofNullable(integration.get("config"))
+              .orElseGet(JsonNodeFactory.instance::objectNode);
+          final JsonNode updatedConfig;
+          try {
+            updatedConfig = EIJson.mapper().updateValue(originalConfig, integrationConfig);
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+          integration.set("config", updatedConfig);
           final HttpPut putReq = new HttpPut(String.format("https://%s/api/v1/%s/integration",
               getAppDomain(), tenantAlias));
           putReq.setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING);
