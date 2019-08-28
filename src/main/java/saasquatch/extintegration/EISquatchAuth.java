@@ -104,10 +104,19 @@ public class EISquatchAuth {
   }
 
   /**
+   * @see EIAuth#verifyTenantScopedToken(JWKSet, String, String)
+   */
+  public Pair<Boolean, String> verifyTenantScopedToken(String tenantScopedToken) {
+    return EIAuth.verifyTenantScopedToken(getCachedSquatchJwks(), getClientSecret(),
+        tenantScopedToken);
+  }
+
+  /**
    * @see EIAuth#getAccessKey(JWKSet, String, String)
    */
   public Pair<Boolean, String> getIntegrationAccessKey(String jwtIssuer, String tenantScopedToken) {
-    return EIAuth.getAccessKey(getCachedSquatchJwks(), getClientSecret(), jwtIssuer, tenantScopedToken);
+    return EIAuth.getAccessKey(getCachedSquatchJwks(), getClientSecret(), jwtIssuer,
+        tenantScopedToken);
   }
 
   /**
