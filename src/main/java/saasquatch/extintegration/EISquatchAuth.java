@@ -106,8 +106,9 @@ public class EISquatchAuth {
   /**
    * @see EIAuth#verifyTenantScopedToken(JWKSet, String, String)
    */
-  public Pair<Boolean, String> verifyTenantScopedToken(String tenantScopedToken) {
-    return EIAuth.verifyTenantScopedToken(getCachedSquatchJwks(), getClientSecret(),
+  public Pair<Boolean, String> verifyTenantScopedToken(String tenantScopedToken,
+      String integrationName) {
+    return EIAuth.verifyTenantScopedToken(getCachedSquatchJwks(), integrationName,
         tenantScopedToken);
   }
 
