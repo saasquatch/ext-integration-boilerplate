@@ -29,7 +29,7 @@ public class EIAuth {
    * @return Pair of (verified, tenantAlias)
    */
   public static Pair<Boolean, String> verifyTenantScopedToken(JWKSet squatchJwks,
-      String clientSecret, String tenantScopedToken) {
+      String integrationName, String tenantScopedToken) {
     final SignedJWT squatchJwt;
     try {
       squatchJwt = SignedJWT.parse(tenantScopedToken);
@@ -57,7 +57,7 @@ public class EIAuth {
       throw new RuntimeException(e);
     }
     final String integration = payloadJson.path("integration").asText("");
-    if (!integration.equalsIgnoreCase("segment")) {
+    if (!integration.equalsIgnoreCase(integrationName)) {
       return Pair.of(false, "Invalid integration");
     }
     final String tenantAlias = StringUtils.substringBeforeLast(
@@ -78,10 +78,10 @@ public class EIAuth {
    * to the integration.
    * @return Pair of (false, errorMessage) or (true, signedJwt)
    */
-  public static Pair<Boolean, String> getAccessKey(JWKSet squatchJwks, String clientSecret,
-      String jwtIssuer, String tenantScopedToken) {
+  public static Pair<Boolean, String> getAccessKey(JWKSet squatchJwks, String integrationName,
+      String clientSecret, String jwtIssuer, String tenantScopedToken) {
     final Pair<Boolean, String> verifyTenantScopedToken =
-        verifyTenantScopedToken(squatchJwks, clientSecret, tenantScopedToken);
+        verifyTenantScopedToken(squatchJwks, integrationName, tenantScopedToken);
     if (!verifyTenantScopedToken.getLeft()) {
       return verifyTenantScopedToken;
     }
