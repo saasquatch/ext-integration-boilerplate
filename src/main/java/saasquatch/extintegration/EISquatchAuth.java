@@ -114,9 +114,10 @@ public class EISquatchAuth {
   /**
    * @see EIAuth#getAccessKey(JWKSet, String, String)
    */
-  public Pair<Boolean, String> getIntegrationAccessKey(String jwtIssuer, String tenantScopedToken) {
-    return EIAuth.getAccessKey(getCachedSquatchJwks(), getClientSecret(), jwtIssuer,
-        tenantScopedToken);
+  public Pair<Boolean, String> getIntegrationAccessKey(String jwtIssuer, String integrationName,
+      String tenantScopedToken) {
+    return EIAuth.getAccessKey(getCachedSquatchJwks(), integrationName, getClientSecret(),
+        jwtIssuer, tenantScopedToken);
   }
 
   /**
