@@ -224,7 +224,7 @@ public class EISquatchAuth {
 
   public CompletionStage<JsonNode> loadIntegration(String tenantAlias) {
     final String url = String.format("https://%s/api/v1/%s/integration/%s",
-        getAppDomain(), tenantAlias, RSUrlCodec.encodeStandard(getClientId()));
+        getAppDomain(), tenantAlias, RSUrlCodec.encode(getClientId()));
     final HttpGet request = new HttpGet(url);
     request.setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING);
     request.setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader());
