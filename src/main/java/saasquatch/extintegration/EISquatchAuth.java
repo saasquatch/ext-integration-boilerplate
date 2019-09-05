@@ -335,7 +335,8 @@ public class EISquatchAuth {
     if (RSJackson.nonEmpty(variables)) {
       reqJson.set("variables", variables);
     }
-    final HttpPost gqlReq = new HttpPost(String.format("/api/v1/%s/graphql", tenantAlias));
+    final HttpPost gqlReq = new HttpPost(String.format("https://%s/api/v1/%s/graphql",
+        getAppDomain(), tenantAlias));
     gqlReq.setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING);
     gqlReq.setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader());
     try {
