@@ -15,6 +15,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -40,6 +41,7 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import saasquatch.common.base.RSUrlCodec;
+import saasquatch.common.json.RSJackson;
 
 public class EISquatchAuth {
 
@@ -321,6 +323,47 @@ public class EISquatchAuth {
             throw new UncheckedIOException(e);
           }
         }, executor);
+  }
+
+  public CompletionStage<EIGraphQLResponse> graphQL(String tenantAlias, String query,
+      String operationName, JsonNode variables) {
+    final ObjectNode reqJson = JsonNodeFactory.instance.objectNode();
+    reqJson.put("query", Validate.notBlank(query));
+    if (operationName != null) {
+      reqJson.put("operationName", operationName);
+    }
+    if (RSJackson.nonEmpty(variables)) {
+      reqJson.set("variables", variables);
+    }
+    final HttpPost gqlReq = new HttpPost(String.format("/api/v1/%s/graphql", tenantAlias));
+    gqlReq.setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING);
+    gqlReq.setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader());
+    try {
+      gqlReq.setEntity(new ByteArrayEntity(EIJson.mapper().writeValueAsBytes(reqJson),
+          ContentType.APPLICATION_JSON));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    final CompletableFuture<HttpResponse> respPromise = new CompletableFuture<>();
+    ioBundle.getHttpAsyncClient().execute(gqlReq, EIApacheHcUtil.completableFuture(respPromise));
+    return respPromise.thenApplyAsync(resp -> {
+      final int status = resp.getStatusLine().getStatusCode();
+      if (status > 299) {
+        String bodyText = "";
+        try {
+          bodyText = EIApacheHcUtil.getBodyText(resp);
+        } catch (IOException e) {}
+        throw new IllegalStateException(
+            String.format("Status[%s] received for GraphQL request for tenant[%s]. Body: %s",
+                status, tenantAlias, bodyText));
+      }
+      try {
+        return EIJson.mapper().readValue(EIApacheHcUtil.getBodyBytes(resp),
+            EIGraphQLResponse.class);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }, executor);
   }
 
 }
