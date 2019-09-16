@@ -257,6 +257,10 @@ public class EISquatchAuth {
     return integrationInstanceCache.get(tenantAlias);
   }
 
+  public void clearIntegrationCache(String tenantAlias) {
+    integrationInstanceCache.synchronous().invalidate(tenantAlias);
+  }
+
   public CompletionStage<JsonNode> getCachedIntegrationConfig(String tenantAlias) {
     return getCachedIntegration(tenantAlias)
         .thenApplyAsync(integration -> {
