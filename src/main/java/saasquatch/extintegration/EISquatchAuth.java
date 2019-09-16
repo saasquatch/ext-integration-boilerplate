@@ -322,6 +322,7 @@ public class EISquatchAuth {
                 status, respBody));
           }
           try {
+            clearIntegrationCache(tenantAlias);
             return EIJson.mapper().readTree(EIApacheHcUtil.getBodyBytes(resp));
           } catch (IOException e) {
             throw new UncheckedIOException(e);
