@@ -40,8 +40,8 @@ import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
-import saasquatch.common.base.RSUrlCodec;
-import saasquatch.common.json.RSJackson;
+import com.saasquatch.common.base.RSUrlCodec;
+import com.saasquatch.common.json.RSJackson;
 
 public class EISquatchAuth {
 
