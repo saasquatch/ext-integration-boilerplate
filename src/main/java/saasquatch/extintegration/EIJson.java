@@ -14,8 +14,9 @@ public class EIJson {
   }
 
   public static ObjectMapper newDefaultMapper() {
-    final ObjectMapper mapper = new ObjectMapper();
-    mapper.getFactory().disable(JsonFactory.Feature.USE_THREAD_LOCAL_FOR_BUFFER_RECYCLING);
+    final ObjectMapper mapper = new ObjectMapper(JsonFactory.builder()
+        .disable(JsonFactory.Feature.USE_THREAD_LOCAL_FOR_BUFFER_RECYCLING)
+        .build());
     return mapper;
   }
 
