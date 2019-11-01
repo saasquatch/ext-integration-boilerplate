@@ -41,7 +41,6 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import com.saasquatch.common.base.RSUrlCodec;
-import com.saasquatch.common.json.RSJackson;
 
 public class EISquatchAuth {
 
@@ -337,7 +336,7 @@ public class EISquatchAuth {
     if (operationName != null) {
       reqJson.put("operationName", operationName);
     }
-    if (RSJackson.nonEmpty(variables)) {
+    if (EIJson.nonEmpty(variables)) {
       reqJson.set("variables", variables);
     }
     final HttpPost gqlReq = new HttpPost(String.format("https://%s/api/v1/%s/graphql",
