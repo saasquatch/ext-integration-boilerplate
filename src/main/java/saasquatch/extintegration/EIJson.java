@@ -48,6 +48,14 @@ public class EIJson {
     return !isEmpty(j);
   }
 
+  public static ArrayNode arrayNodeOf(JsonNode... nodes) {
+    final ArrayNode result = JsonNodeFactory.instance.arrayNode();
+    for (JsonNode node : nodes) {
+      result.add(node);
+    }
+    return result;
+  }
+
   public static JsonNode mutateValueNodes(@Nonnull final JsonNode json,
       @Nonnull final Function<ValueNode, JsonNode> mutation) {
     if (json.isMissingNode()) {
