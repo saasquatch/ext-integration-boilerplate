@@ -4,7 +4,7 @@
 
   <groupId>saasquatch</groupId>
   <artifactId>ext-integration-boilerplate</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.1-alpha-1</version>
   <packaging>jar</packaging>
 
   <name>ext-integration-boilerplate</name>
@@ -138,5 +138,13 @@
       </plugin>
     </plugins>
   </build>
+
+  <distributionManagement>
+    <repository>
+      <id>bintray-saasquatch-coreapp-libs</id>
+      <name>saasquatch-coreapp-libs</name>
+      <url>https://api.bintray.com/maven/saasquatch/coreapp-libs/ext-integration-boilerplate/;publish=1</url>
+    </repository>
+  </distributionManagement>
 
 </project>
