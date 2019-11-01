@@ -1,5 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>saasquatch</groupId>
@@ -15,13 +15,28 @@
     <jackson.version>2.10.0</jackson.version>
     <jackson.databind.version>2.10.0</jackson.databind.version>
   </properties>
-  
+
   <repositories>
     <repository>
-      <id>jitpack.io</id>
-      <url>https://jitpack.io</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>bintray-saasquatch-java-libs</id>
+      <name>bintray</name>
+      <url>https://dl.bintray.com/saasquatch/java-libs</url>
     </repository>
   </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>bintray-saasquatch-java-libs</id>
+      <name>bintray-plugins</name>
+      <url>https://dl.bintray.com/saasquatch/java-libs</url>
+    </pluginRepository>
+  </pluginRepositories>
 
   <dependencies>
     <dependency>
@@ -36,9 +51,9 @@
       <version>1.7.28</version>
     </dependency>
     <dependency>
-      <groupId>com.github.saasquatch</groupId>
+      <groupId>com.saasquatch</groupId>
       <artifactId>squatch-common</artifactId>
-      <version>0.0.17</version>
+      <version>0.1.0-alpha-2</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -120,7 +135,7 @@
             </goals>
           </execution>
         </executions>
-     </plugin>
+      </plugin>
     </plugins>
   </build>
 
