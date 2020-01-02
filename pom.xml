@@ -12,8 +12,8 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <jackson.version>2.10.0</jackson.version>
-    <jackson.databind.version>2.10.0</jackson.databind.version>
+    <jackson.version>2.10.1</jackson.version>
+    <jackson.databind.version>2.10.1</jackson.databind.version>
   </properties>
 
   <repositories>
@@ -88,7 +88,7 @@
     <dependency>
       <groupId>com.nimbusds</groupId>
       <artifactId>nimbus-jose-jwt</artifactId>
-      <version>8.2</version>
+      <version>8.4</version>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
