@@ -18,29 +18,10 @@
 
   <repositories>
     <repository>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <id>bintray-saasquatch-java-libs</id>
-      <name>bintray</name>
-      <url>https://dl.bintray.com/saasquatch/java-libs</url>
-    </repository>
-    <repository>
       <id>jitpack.io</id>
       <url>https://jitpack.io</url>
     </repository>
   </repositories>
-
-  <pluginRepositories>
-    <pluginRepository>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <id>bintray-saasquatch-java-libs</id>
-      <name>bintray-plugins</name>
-      <url>https://dl.bintray.com/saasquatch/java-libs</url>
-    </pluginRepository>
-  </pluginRepositories>
 
   <dependencies>
     <dependency>
@@ -142,13 +123,5 @@
       </plugin>
     </plugins>
   </build>
-
-  <distributionManagement>
-    <repository>
-      <id>bintray-saasquatch-coreapp-libs</id>
-      <name>saasquatch-coreapp-libs</name>
-      <url>https://api.bintray.com/maven/saasquatch/coreapp-libs/ext-integration-boilerplate/;publish=1</url>
-    </repository>
-  </distributionManagement>
 
 </project>
