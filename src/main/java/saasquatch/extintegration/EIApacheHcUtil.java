@@ -7,10 +7,12 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.entity.DeflateInputStream;
 import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
 import org.apache.hc.client5.http.impl.async.HttpAsyncClients;
@@ -31,9 +33,17 @@ public class EIApacheHcUtil {
 
   public static final String DEFAULT_ACCEPT_ENCODING = "gzip,deflate";
 
+  private static final RequestConfig defaultRequestConfig = RequestConfig.custom()
+      // Set some generous timeouts just to prevent a hanging connection
+      .setConnectTimeout(30, TimeUnit.SECONDS)
+      .setConnectionRequestTimeout(60, TimeUnit.SECONDS)
+      .setResponseTimeout(60, TimeUnit.SECONDS)
+      .build();
+
   public static CloseableHttpClient newBlockingClient() {
     final CloseableHttpClient httpClient = HttpClients.custom()
         .disableCookieManagement()
+        .setDefaultRequestConfig(defaultRequestConfig)
         .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
             .setMaxConnPerRoute(100) // default is 2
             .setMaxConnTotal(200) // default is 20
@@ -45,6 +55,7 @@ public class EIApacheHcUtil {
   public static CloseableHttpAsyncClient newAsyncClient() {
     final CloseableHttpAsyncClient httpAsyncClient = HttpAsyncClients.custom()
         .disableCookieManagement()
+        .setDefaultRequestConfig(defaultRequestConfig)
         .setConnectionManager(PoolingAsyncClientConnectionManagerBuilder.create()
             .setMaxConnPerRoute(100) // default is 2
             .setMaxConnTotal(200) // default is 20
