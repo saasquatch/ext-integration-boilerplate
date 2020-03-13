@@ -38,6 +38,7 @@ import com.google.common.net.HttpHeaders;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
+import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
@@ -47,6 +48,8 @@ public class EISquatchAuth {
 
   private final Executor executor;
   private final LoadingCache<Object, JWKSet> squatchJwksCache;
+  // kid -> JWK
+  private final AsyncLoadingCache<String, JWK> squatchJwkCache;
   private final LoadingCache<Object, String> accessTokenCache;
   // tenantAlias -> segment integration
   private final AsyncLoadingCache<String, JsonNode> integrationInstanceCache;
@@ -74,6 +77,11 @@ public class EISquatchAuth {
         .refreshAfterWrite(1, TimeUnit.DAYS)
         .executor(this.executor)
         .build(ignored -> loadSquatchJwks());
+    this.squatchJwkCache = Caffeine.newBuilder()
+        .refreshAfterWrite(1, TimeUnit.DAYS)
+        .maximumSize(8)
+        .executor(this.executor)
+        .<String, JWK>buildAsync((kid, _executor) -> loadJwkForSquatchJwks(kid).toCompletableFuture());
     this.accessTokenCache = Caffeine.newBuilder()
         .refreshAfterWrite(6, TimeUnit.HOURS)
         .executor(this.executor)
@@ -178,8 +186,34 @@ public class EISquatchAuth {
     }
   }
 
+  public CompletionStage<JWK> loadJwkForSquatchJwks(String kid) {
+    final String protocol = https ? "https://" : "http://";
+    final SimpleHttpRequest request = SimpleHttpRequests.get(protocol + getAppDomain()
+        + "/.well-known/jwks.json");
+    request.setConfig(RequestConfig.custom()
+        .setConnectTimeout(2500, TimeUnit.MILLISECONDS)
+        .setResponseTimeout(5, TimeUnit.SECONDS)
+        .build());
+    final CompletableFuture<SimpleHttpResponse> cf = new CompletableFuture<>();
+    ioBundle.getHttpAsyncClient().execute(request, EIApacheHcUtil.completableFuture(cf));
+    return cf.thenApplyAsync(resp -> {
+      final JWKSet jwks;
+      try {
+        jwks = JWKSet.parse(resp.getBodyText());
+      } catch (ParseException e) {
+        throw new RuntimeException(e);
+      }
+      return jwks.getKeyByKeyId(kid);
+    }, executor);
+  }
+
+  @Deprecated
   public JWKSet getCachedSquatchJwks() {
     return squatchJwksCache.get(ObjectUtils.NULL);
+  }
+
+  public JWK getCachedJwkForKid(String kid) {
+    return squatchJwkCache.synchronous().get(kid);
   }
 
   public String loadAccessToken() {
