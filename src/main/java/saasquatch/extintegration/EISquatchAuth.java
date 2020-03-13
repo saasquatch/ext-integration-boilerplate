@@ -81,7 +81,9 @@ public class EISquatchAuth {
         .refreshAfterWrite(1, TimeUnit.DAYS)
         .maximumSize(8)
         .executor(this.executor)
-        .<String, JWK>buildAsync((kid, _executor) -> loadJwkForSquatchJwks(kid).toCompletableFuture());
+        .<String, JWK>buildAsync((kid, _executor) -> {
+          return loadJwkForSquatchJwks(kid).toCompletableFuture();
+        });
     this.accessTokenCache = Caffeine.newBuilder()
         .refreshAfterWrite(6, TimeUnit.HOURS)
         .executor(this.executor)
@@ -118,7 +120,7 @@ public class EISquatchAuth {
    */
   public Pair<Boolean, String> verifyTenantScopedToken(String tenantScopedToken,
       String integrationName) {
-    return EIAuth.verifyTenantScopedToken(getCachedSquatchJwks(), integrationName,
+    return EIAuth.verifyTenantScopedToken(this::getCachedJwkForKid, integrationName,
         tenantScopedToken);
   }
 
@@ -127,7 +129,7 @@ public class EISquatchAuth {
    */
   public Pair<Boolean, String> getIntegrationAccessKey(String jwtIssuer, String integrationName,
       String tenantScopedToken) {
-    return EIAuth.getAccessKey(getCachedSquatchJwks(), integrationName, getClientSecret(),
+    return EIAuth.getAccessKey(this::getCachedJwkForKid, integrationName, getClientSecret(),
         jwtIssuer, tenantScopedToken);
   }
 
@@ -176,6 +178,7 @@ public class EISquatchAuth {
     return null;
   }
 
+  @Deprecated
   public JWKSet loadSquatchJwks() {
     final String protocol = https ? "https://" : "http://";
     try {
@@ -207,6 +210,9 @@ public class EISquatchAuth {
     }, executor);
   }
 
+  /**
+   * @deprecated use {@link #getCachedJwkForKid(String)}
+   */
   @Deprecated
   public JWKSet getCachedSquatchJwks() {
     return squatchJwksCache.get(ObjectUtils.NULL);
