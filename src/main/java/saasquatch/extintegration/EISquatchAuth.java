@@ -4,7 +4,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.text.ParseException;
 import java.util.Base64;
 import java.util.Optional;
@@ -47,7 +46,6 @@ import com.saasquatch.common.base.RSUrlCodec;
 public class EISquatchAuth {
 
   private final Executor executor;
-  private final LoadingCache<Object, JWKSet> squatchJwksCache;
   // kid -> JWK
   private final AsyncLoadingCache<String, JWK> squatchJwkCache;
   private final LoadingCache<Object, String> accessTokenCache;
@@ -73,10 +71,6 @@ public class EISquatchAuth {
     this.jwtTokenUrl = jwtTokenUrl;
 
     this.executor = ioBundle.getExecutor();
-    this.squatchJwksCache = Caffeine.newBuilder()
-        .refreshAfterWrite(1, TimeUnit.DAYS)
-        .executor(this.executor)
-        .build(ignored -> loadSquatchJwks());
     this.squatchJwkCache = Caffeine.newBuilder()
         .refreshAfterWrite(1, TimeUnit.DAYS)
         .maximumSize(8)
@@ -99,7 +93,7 @@ public class EISquatchAuth {
   }
 
   public void init() {
-    Stream.of(squatchJwksCache, accessTokenCache)
+    Stream.of(accessTokenCache)
         .forEach(cache -> cache.get(ObjectUtils.NULL));
   }
 
@@ -155,8 +149,7 @@ public class EISquatchAuth {
     } catch (ParseException e) {
       return "Invalid JWT";
     }
-    final RSAKey jwk = (RSAKey) getCachedSquatchJwks()
-        .getKeyByKeyId(signedJWT.getHeader().getKeyID());
+    final RSAKey jwk = (RSAKey) getCachedJwkForKid(signedJWT.getHeader().getKeyID());
     if (jwk == null) {
       return "jwk not found for kid";
     }
@@ -178,17 +171,6 @@ public class EISquatchAuth {
     return null;
   }
 
-  @Deprecated
-  public JWKSet loadSquatchJwks() {
-    final String protocol = https ? "https://" : "http://";
-    try {
-      return JWKSet.load(new URL(protocol + getAppDomain()
-          + "/.well-known/jwks.json"), 2500, 5000, 0);
-    } catch (IOException | ParseException e) {
-      throw new RuntimeException();
-    }
-  }
-
   public CompletionStage<JWK> loadJwkForSquatchJwks(String kid) {
     final String protocol = https ? "https://" : "http://";
     final SimpleHttpRequest request = SimpleHttpRequests.get(protocol + getAppDomain()
@@ -208,14 +190,6 @@ public class EISquatchAuth {
       }
       return jwks.getKeyByKeyId(kid);
     }, executor);
-  }
-
-  /**
-   * @deprecated use {@link #getCachedJwkForKid(String)}
-   */
-  @Deprecated
-  public JWKSet getCachedSquatchJwks() {
-    return squatchJwksCache.get(ObjectUtils.NULL);
   }
 
   public JWK getCachedJwkForKid(String kid) {
