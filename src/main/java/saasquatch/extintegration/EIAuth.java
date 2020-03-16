@@ -3,6 +3,7 @@ package saasquatch.extintegration;
 import java.io.IOException;
 import java.text.ParseException;
 import java.time.Instant;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -17,7 +18,7 @@ import com.nimbusds.jose.KeyLengthException;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
-import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
@@ -28,7 +29,7 @@ public class EIAuth {
    * Verify a tenant scoped token
    * @return Pair of (verified, tenantAlias)
    */
-  public static Pair<Boolean, String> verifyTenantScopedToken(JWKSet squatchJwks,
+  public static Pair<Boolean, String> verifyTenantScopedToken(Function<String, JWK> jwkFetcher,
       String integrationName, String tenantScopedToken) {
     final SignedJWT squatchJwt;
     try {
@@ -36,7 +37,7 @@ public class EIAuth {
     } catch (ParseException e) {
       return Pair.of(false, "Invalid JWT");
     }
-    final RSAKey jwk = (RSAKey) squatchJwks.getKeyByKeyId(squatchJwt.getHeader().getKeyID());
+    final RSAKey jwk = (RSAKey) jwkFetcher.apply(squatchJwt.getHeader().getKeyID());
     if (jwk == null) {
       return Pair.of(false, "jwk not found for kid");
     }
@@ -78,10 +79,10 @@ public class EIAuth {
    * to the integration.
    * @return Pair of (false, errorMessage) or (true, signedJwt)
    */
-  public static Pair<Boolean, String> getAccessKey(JWKSet squatchJwks, String integrationName,
-      String clientSecret, String jwtIssuer, String tenantScopedToken) {
+  public static Pair<Boolean, String> getAccessKey(Function<String, JWK> jwkFetcher,
+      String integrationName, String clientSecret, String jwtIssuer, String tenantScopedToken) {
     final Pair<Boolean, String> verifyTenantScopedToken =
-        verifyTenantScopedToken(squatchJwks, integrationName, tenantScopedToken);
+        verifyTenantScopedToken(jwkFetcher, integrationName, tenantScopedToken);
     if (!verifyTenantScopedToken.getLeft()) {
       return verifyTenantScopedToken;
     }

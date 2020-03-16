@@ -4,7 +4,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.text.ParseException;
 import java.util.Base64;
 import java.util.Optional;
@@ -38,6 +37,7 @@ import com.google.common.net.HttpHeaders;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
+import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
@@ -46,7 +46,8 @@ import com.saasquatch.common.base.RSUrlCodec;
 public class EISquatchAuth {
 
   private final Executor executor;
-  private final LoadingCache<Object, JWKSet> squatchJwksCache;
+  // kid -> JWK
+  private final AsyncLoadingCache<String, JWK> squatchJwkCache;
   private final LoadingCache<Object, String> accessTokenCache;
   // tenantAlias -> segment integration
   private final AsyncLoadingCache<String, JsonNode> integrationInstanceCache;
@@ -70,10 +71,13 @@ public class EISquatchAuth {
     this.jwtTokenUrl = jwtTokenUrl;
 
     this.executor = ioBundle.getExecutor();
-    this.squatchJwksCache = Caffeine.newBuilder()
+    this.squatchJwkCache = Caffeine.newBuilder()
         .refreshAfterWrite(1, TimeUnit.DAYS)
+        .maximumSize(8)
         .executor(this.executor)
-        .build(ignored -> loadSquatchJwks());
+        .<String, JWK>buildAsync((kid, _executor) -> {
+          return loadJwkForSquatchJwks(kid).toCompletableFuture();
+        });
     this.accessTokenCache = Caffeine.newBuilder()
         .refreshAfterWrite(6, TimeUnit.HOURS)
         .executor(this.executor)
@@ -89,7 +93,7 @@ public class EISquatchAuth {
   }
 
   public void init() {
-    Stream.of(squatchJwksCache, accessTokenCache)
+    Stream.of(accessTokenCache)
         .forEach(cache -> cache.get(ObjectUtils.NULL));
   }
 
@@ -110,7 +114,7 @@ public class EISquatchAuth {
    */
   public Pair<Boolean, String> verifyTenantScopedToken(String tenantScopedToken,
       String integrationName) {
-    return EIAuth.verifyTenantScopedToken(getCachedSquatchJwks(), integrationName,
+    return EIAuth.verifyTenantScopedToken(this::getCachedJwkForKid, integrationName,
         tenantScopedToken);
   }
 
@@ -119,7 +123,7 @@ public class EISquatchAuth {
    */
   public Pair<Boolean, String> getIntegrationAccessKey(String jwtIssuer, String integrationName,
       String tenantScopedToken) {
-    return EIAuth.getAccessKey(getCachedSquatchJwks(), integrationName, getClientSecret(),
+    return EIAuth.getAccessKey(this::getCachedJwkForKid, integrationName, getClientSecret(),
         jwtIssuer, tenantScopedToken);
   }
 
@@ -145,8 +149,7 @@ public class EISquatchAuth {
     } catch (ParseException e) {
       return "Invalid JWT";
     }
-    final RSAKey jwk = (RSAKey) getCachedSquatchJwks()
-        .getKeyByKeyId(signedJWT.getHeader().getKeyID());
+    final RSAKey jwk = (RSAKey) getCachedJwkForKid(signedJWT.getHeader().getKeyID());
     if (jwk == null) {
       return "jwk not found for kid";
     }
@@ -168,18 +171,29 @@ public class EISquatchAuth {
     return null;
   }
 
-  public JWKSet loadSquatchJwks() {
+  public CompletionStage<JWK> loadJwkForSquatchJwks(String kid) {
     final String protocol = https ? "https://" : "http://";
-    try {
-      return JWKSet.load(new URL(protocol + getAppDomain()
-          + "/.well-known/jwks.json"), 2500, 5000, 0);
-    } catch (IOException | ParseException e) {
-      throw new RuntimeException();
-    }
+    final SimpleHttpRequest request = SimpleHttpRequests.get(protocol + getAppDomain()
+        + "/.well-known/jwks.json");
+    request.setConfig(RequestConfig.custom()
+        .setConnectTimeout(2500, TimeUnit.MILLISECONDS)
+        .setResponseTimeout(5, TimeUnit.SECONDS)
+        .build());
+    final CompletableFuture<SimpleHttpResponse> cf = new CompletableFuture<>();
+    ioBundle.getHttpAsyncClient().execute(request, EIApacheHcUtil.completableFuture(cf));
+    return cf.thenApplyAsync(resp -> {
+      final JWKSet jwks;
+      try {
+        jwks = JWKSet.parse(resp.getBodyText());
+      } catch (ParseException e) {
+        throw new RuntimeException(e);
+      }
+      return jwks.getKeyByKeyId(kid);
+    }, executor);
   }
 
-  public JWKSet getCachedSquatchJwks() {
-    return squatchJwksCache.get(ObjectUtils.NULL);
+  public JWK getCachedJwkForKid(String kid) {
+    return squatchJwkCache.synchronous().get(kid);
   }
 
   public String loadAccessToken() {
