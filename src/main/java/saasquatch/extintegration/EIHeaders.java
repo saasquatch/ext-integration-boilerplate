@@ -13,7 +13,7 @@ public class EIHeaders {
 
   public static Map<String, String> getGlobalHeaders(@Nonnull Collection<String> frameSrc) {
     final List<String> csp = new ArrayList<>();
-    csp.add("default-src https: 'unsafe-eval'");
+    csp.add("default-src https: 'unafe-inline' 'unsafe-eval'");
     if (!frameSrc.isEmpty()) {
       csp.add("frame-src " + String.join(" ", frameSrc));
     }
@@ -23,7 +23,7 @@ public class EIHeaders {
     headers.put(HttpHeaders.X_FRAME_OPTIONS, "SAMEORIGIN");
     headers.put(HttpHeaders.X_CONTENT_TYPE_OPTIONS, "nosniff");
     headers.put(HttpHeaders.REFERRER_POLICY, "no-referrer-when-downgrade");
-    headers.put("Feature-Policy", "none");
+    headers.put("Feature-Policy", "'none'");
     return Collections.unmodifiableMap(headers);
   }
 
