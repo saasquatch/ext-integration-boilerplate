@@ -13,7 +13,7 @@ public class EIHeaders {
 
   public static Map<String, String> getGlobalHeaders(@Nonnull Collection<String> frameSrc) {
     final List<String> csp = new ArrayList<>();
-    csp.add("default-src https:");
+    csp.add("default-src https: 'unsafe-eval'");
     if (!frameSrc.isEmpty()) {
       csp.add("frame-src " + String.join(" ", frameSrc));
     }
