@@ -18,6 +18,7 @@ public class EIHeaders {
       csp.add("frame-src " + String.join(" ", frameSrc));
     }
     final Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+    headers.put(HttpHeaders.STRICT_TRANSPORT_SECURITY, "max-age=31536000");
     headers.put(HttpHeaders.CONTENT_SECURITY_POLICY, String.join("; ", csp));
     headers.put(HttpHeaders.X_FRAME_OPTIONS, "SAMEORIGIN");
     headers.put(HttpHeaders.X_CONTENT_TYPE_OPTIONS, "nosniff");
