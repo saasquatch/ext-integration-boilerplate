@@ -1,30 +1,33 @@
 package saasquatch.extintegration;
 
+import java.io.UncheckedIOException;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.ValueNode;
-import com.google.common.base.Suppliers;
 
-public class EIJson {
+public final class EIJson {
 
-  private static final Supplier<ObjectMapper> MAPPER = Suppliers.memoize(EIJson::newDefaultMapper);
+  private EIJson() {}
 
   public static final ObjectMapper mapper() {
-    return MAPPER.get();
+    return MapperHolder.MAPPER;
   }
 
   public static ObjectMapper newDefaultMapper() {
     final ObjectMapper mapper = new ObjectMapper(JsonFactory.builder()
-        .disable(JsonFactory.Feature.USE_THREAD_LOCAL_FOR_BUFFER_RECYCLING)
-        .build());
+        .disable(JsonFactory.Feature.USE_THREAD_LOCAL_FOR_BUFFER_RECYCLING).build());
     return mapper;
   }
 
@@ -77,6 +80,64 @@ public class EIJson {
     } else {
       return mutation.apply((ValueNode) json);
     }
+  }
+
+  public static Map<String, Object> toMap(@Nullable JsonNode json) {
+    return mapper().convertValue(json, new TypeReference<LinkedHashMap<String, Object>>() {});
+  }
+
+  public static Map<String, Object> toMap(@Nullable Object obj) {
+    return mapper().convertValue(obj, new TypeReference<LinkedHashMap<String, Object>>() {});
+  }
+
+  public static String stringify(JsonNode json) {
+    try {
+      return mapper().writeValueAsString(json);
+    } catch (JsonProcessingException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  public static byte[] toBytes(@Nonnull final JsonNode json) {
+    try {
+      return mapper().writeValueAsBytes(json);
+    } catch (JsonProcessingException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  public static boolean hasArraysOfArrays(JsonNode j) {
+    return hasArraysOfArrays(j, false);
+  }
+
+  private static boolean hasArraysOfArrays(JsonNode j, boolean parentIsArray) {
+    if (j == null) {
+      return false;
+    } else if (j.isObject()) {
+      final Iterator<Map.Entry<String, JsonNode>> fieldsIter = j.fields();
+      while (fieldsIter.hasNext()) {
+        final Map.Entry<String, JsonNode> entry = fieldsIter.next();
+        if (hasArraysOfArrays(entry.getValue(), false)) {
+          return true;
+        }
+      }
+      return false;
+    } else if (j.isArray()) {
+      if (parentIsArray)
+        return true;
+      for (JsonNode arrayElem : j) {
+        if (hasArraysOfArrays(arrayElem, true)) {
+          return true;
+        }
+      }
+      return false;
+    } else {
+      return false;
+    }
+  }
+
+  private static final class MapperHolder {
+    private static final ObjectMapper MAPPER = newDefaultMapper();
   }
 
 }
