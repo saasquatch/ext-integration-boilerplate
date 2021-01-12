@@ -1,6 +1,7 @@
 package saasquatch.extintegration;
 
 import java.io.UncheckedIOException;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -102,6 +103,36 @@ public final class EIJson {
       return mapper().writeValueAsBytes(json);
     } catch (JsonProcessingException e) {
       throw new UncheckedIOException(e);
+    }
+  }
+
+  public static boolean hasArraysOfArrays(JsonNode j) {
+    return hasArraysOfArrays(j, false);
+  }
+
+  private static boolean hasArraysOfArrays(JsonNode j, boolean parentIsArray) {
+    if (j == null) {
+      return false;
+    } else if (j.isObject()) {
+      final Iterator<Map.Entry<String, JsonNode>> fieldsIter = j.fields();
+      while (fieldsIter.hasNext()) {
+        final Map.Entry<String, JsonNode> entry = fieldsIter.next();
+        if (hasArraysOfArrays(entry.getValue(), false)) {
+          return true;
+        }
+      }
+      return false;
+    } else if (j.isArray()) {
+      if (parentIsArray)
+        return true;
+      for (JsonNode arrayElem : j) {
+        if (hasArraysOfArrays(arrayElem, true)) {
+          return true;
+        }
+      }
+      return false;
+    } else {
+      return false;
     }
   }
 
