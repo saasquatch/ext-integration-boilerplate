@@ -271,6 +271,10 @@ public class EISquatchAuth {
     }, executor);
   }
 
+  public CompletionStage<JsonNode> loadIntegrationConfig(String tenantAlias) {
+    return _integrationToConfig(loadIntegration(tenantAlias));
+  }
+
   public CompletionStage<JsonNode> getCachedIntegration(String tenantAlias) {
     return integrationInstanceCache.get(tenantAlias);
   }
@@ -280,17 +284,18 @@ public class EISquatchAuth {
   }
 
   public CompletionStage<JsonNode> getCachedIntegrationConfig(String tenantAlias) {
-    return getCachedIntegration(tenantAlias)
-        .thenApplyAsync(integration -> {
-          if (integration == null)
-            return null;
-          if (!integration.path("enabled").asBoolean(false))
-            return null;
-          return integration.get("config");
-        }, executor).thenApplyAsync(integration -> {
-          return Optional.ofNullable(integration)
-              .orElseGet(JsonNodeFactory.instance::objectNode);
-        }, executor);
+    return _integrationToConfig(getCachedIntegration(tenantAlias));
+  }
+
+  private CompletionStage<JsonNode> _integrationToConfig(CompletionStage<JsonNode> integrationPromise) {
+    return integrationPromise.thenApplyAsync(integration -> {
+      if (integration == null)
+        return null;
+      if (!integration.path("enabled").asBoolean(false))
+        return null;
+      return Optional.ofNullable(integration.get("config"))
+          .orElseGet(JsonNodeFactory.instance::objectNode);
+    }, executor);
   }
 
   public CompletionStage<JsonNode> updateIntegrationConfig(String tenantAlias,
