@@ -4,7 +4,9 @@ import java.io.UncheckedIOException;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collector;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -21,7 +23,7 @@ public final class EIJson {
 
   private EIJson() {}
 
-  public static final ObjectMapper mapper() {
+  public static ObjectMapper mapper() {
     return MapperHolder.MAPPER;
   }
 
@@ -29,6 +31,15 @@ public final class EIJson {
     final ObjectMapper mapper = new ObjectMapper(JsonFactory.builder()
         .disable(JsonFactory.Feature.USE_THREAD_LOCAL_FOR_BUFFER_RECYCLING).build());
     return mapper;
+  }
+
+  public static <T extends JsonNode> Collector<T, ?, ArrayNode> toArrayNode() {
+    return Collector.of(JsonNodeFactory.instance::arrayNode,
+        ArrayNode::add,
+        (a1, a2) -> {
+          a1.addAll(a2);
+          return a1;
+        });
   }
 
   public static boolean isNull(@Nullable JsonNode j) {
@@ -133,6 +144,42 @@ public final class EIJson {
       return false;
     } else {
       return false;
+    }
+  }
+
+  public static void replaceArraysOfArrays(JsonNode j, Function<ArrayNode, JsonNode> transform) {
+    replaceArraysOfArrays(j, transform, JsonNodeFactory.instance.nullNode(), -1);
+  }
+
+  private static void replaceArraysOfArrays(JsonNode j, Function<ArrayNode, JsonNode> transform,
+      @Nonnull JsonNode parent, int indexInParent) {
+    if (j == null) {
+      return;
+    } else if (j.isObject()) {
+      final Iterator<Map.Entry<String, JsonNode>> fieldsIter = j.fields();
+      while (fieldsIter.hasNext()) {
+        final Map.Entry<String, JsonNode> entry = fieldsIter.next();
+        replaceArraysOfArrays(entry.getValue(), transform, j, -1);
+      }
+    } else if (j.isArray()) {
+      if (parent.isArray()) {
+        final JsonNode transformResult = Optional.ofNullable(transform.apply((ArrayNode) j))
+            .orElseGet(JsonNodeFactory.instance::missingNode);
+        ArrayNode.class.cast(parent).set(indexInParent, transformResult);
+        return;
+      }
+      int index = 0;
+      for (JsonNode arrayElem : j) {
+        replaceArraysOfArrays(arrayElem, transform, j, index++);
+      }
+      // Get rid of non null missing nodes
+      final Iterator<JsonNode> arrayIter = j.iterator();
+      while (arrayIter.hasNext()) {
+        final JsonNode arrayElem = arrayIter.next();
+        if (arrayElem != null && arrayElem.isMissingNode()) {
+          arrayIter.remove();
+        }
+      }
     }
   }
 
