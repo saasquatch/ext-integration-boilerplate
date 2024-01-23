@@ -1,6 +1,9 @@
 package saasquatch.extintegration;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+
+import com.google.common.io.ByteStreams;
+import com.google.common.net.HttpHeaders;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,23 +28,21 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.NameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.io.ByteStreams;
-import com.google.common.net.HttpHeaders;
 
 public class EIApacheHcUtil {
+
   private static final Logger logger = LoggerFactory.getLogger(EIApacheHcUtil.class);
 
   public static final String DEFAULT_ACCEPT_ENCODING = "gzip,deflate";
 
   private static final RequestConfig defaultRequestConfig = RequestConfig.custom()
       // Set some generous timeouts just to prevent a hanging connection
-      .setConnectTimeout(30, TimeUnit.SECONDS)
       .setConnectionRequestTimeout(60, TimeUnit.SECONDS)
       .setResponseTimeout(60, TimeUnit.SECONDS)
       .build();
 
   public static CloseableHttpClient newBlockingClient() {
-    final CloseableHttpClient httpClient = HttpClients.custom()
+    return HttpClients.custom()
         .disableCookieManagement()
         .setDefaultRequestConfig(defaultRequestConfig)
         .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
@@ -49,11 +50,10 @@ public class EIApacheHcUtil {
             .setMaxConnTotal(200) // default is 20
             .build())
         .build();
-    return httpClient;
   }
 
   public static CloseableHttpAsyncClient newAsyncClient() {
-    final CloseableHttpAsyncClient httpAsyncClient = HttpAsyncClients.custom()
+    return HttpAsyncClients.custom()
         .disableCookieManagement()
         .setDefaultRequestConfig(defaultRequestConfig)
         .setConnectionManager(PoolingAsyncClientConnectionManagerBuilder.create()
@@ -61,7 +61,6 @@ public class EIApacheHcUtil {
             .setMaxConnTotal(200) // default is 20
             .build())
         .build();
-    return httpAsyncClient;
   }
 
   /**
@@ -89,33 +88,37 @@ public class EIApacheHcUtil {
   }
 
   /**
-   * Get response body as a byte array based on the content encoding.
-   * This method is meant to be used with the async client.
+   * Get response body as a byte array based on the content encoding. This method is meant to be
+   * used with the async client.
    */
   public static byte[] getBodyBytes(SimpleHttpResponse resp) throws IOException {
     final String contentEncoding = Optional.ofNullable(
-        resp.getFirstHeader(HttpHeaders.CONTENT_ENCODING))
+            resp.getFirstHeader(HttpHeaders.CONTENT_ENCODING))
         .map(NameValuePair::getValue)
         .map(StringUtils::stripToNull)
         .map(String::toLowerCase)
         .orElse(null);
     final byte[] bodyBytes = resp.getBodyBytes();
-    if (bodyBytes == null) return null;
+    if (bodyBytes == null) {
+      return null;
+    }
     try (
-      InputStream wrappedIn = getInputStreamForContentEncoding(
-          new ByteArrayInputStream(bodyBytes), contentEncoding);
+        InputStream wrappedIn = getInputStreamForContentEncoding(
+            new ByteArrayInputStream(bodyBytes), contentEncoding);
     ) {
       return ByteStreams.toByteArray(wrappedIn);
     }
   }
 
   /**
-   * Get response body as a String based on the content encoding and charset.
-   * This method is meant to be used with the async client.
+   * Get response body as a String based on the content encoding and charset. This method is meant
+   * to be used with the async client.
    */
   public static String getBodyText(SimpleHttpResponse resp) throws IOException {
     final byte[] bodyBytes = getBodyBytes(resp);
-    if (bodyBytes == null) return null;
+    if (bodyBytes == null) {
+      return null;
+    }
     final Charset charset = Optional.ofNullable(resp.getContentType())
         .map(ContentType::getCharset)
         .orElse(UTF_8);
@@ -124,18 +127,20 @@ public class EIApacheHcUtil {
 
   static InputStream getInputStreamForContentEncoding(InputStream source,
       @Nullable String contentEncoding) throws IOException {
-    if (StringUtils.isBlank(contentEncoding)) return source;
+    if (StringUtils.isBlank(contentEncoding)) {
+      return source;
+    }
     switch (contentEncoding.trim().toLowerCase()) {
-    case "gzip":
-    case "x-gzip":
-      return new GZIPInputStream(source);
-    case "deflate":
-      return new DeflateInputStream(source);
-    case "identity":
-      return source;
-    default:
-      logger.warn("Unrecognized Content-Encoding: [{}]", contentEncoding);
-      return source;
+      case "gzip":
+      case "x-gzip":
+        return new GZIPInputStream(source);
+      case "deflate":
+        return new DeflateInputStream(source);
+      case "identity":
+        return source;
+      default:
+        logger.warn("Unrecognized Content-Encoding: [{}]", contentEncoding);
+        return source;
     }
   }
 
