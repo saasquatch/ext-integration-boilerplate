@@ -1,32 +1,7 @@
 package saasquatch.extintegration;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
-import java.text.ParseException;
-import java.util.Base64;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
-import javax.annotation.Nullable;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.Validate;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
-import org.apache.hc.client5.http.async.methods.SimpleHttpRequests;
-import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.HttpStatus;
-import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -42,6 +17,33 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import com.saasquatch.common.base.RSUrlCodec;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
+import java.text.ParseException;
+import java.util.Base64;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
+import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
+import org.apache.hc.client5.http.async.methods.SimpleRequestBuilder;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 
 public class EISquatchAuth {
 
@@ -84,12 +86,12 @@ public class EISquatchAuth {
         .build(ignored -> loadAccessToken());
     this.integrationInstanceCache =
         Caffeine.newBuilder()
-        .maximumSize(16)
-        .expireAfterWrite(1, TimeUnit.MINUTES)
-        .executor(this.executor)
-        .buildAsync((tenantAlias, _executor) -> {
-          return loadIntegration(tenantAlias).toCompletableFuture();
-        });
+            .maximumSize(16)
+            .expireAfterWrite(1, TimeUnit.MINUTES)
+            .executor(this.executor)
+            .buildAsync((tenantAlias, _executor) -> {
+              return loadIntegration(tenantAlias).toCompletableFuture();
+            });
   }
 
   public void init() {
@@ -110,7 +112,7 @@ public class EISquatchAuth {
   }
 
   /**
-   * @see EIAuth#verifyTenantScopedToken(JWKSet, String, String)
+   * @see EIAuth#verifyTenantScopedToken(Function, String, String)
    */
   public Pair<Boolean, String> verifyTenantScopedToken(String tenantScopedToken,
       String integrationName) {
@@ -119,7 +121,7 @@ public class EISquatchAuth {
   }
 
   /**
-   * @see EIAuth#getAccessKey(JWKSet, String, String)
+   * @see EIAuth#getAccessKey(Function, String, String, String, String)
    */
   public Pair<Boolean, String> getIntegrationAccessKey(String jwtIssuer, String integrationName,
       String tenantScopedToken) {
@@ -136,11 +138,14 @@ public class EISquatchAuth {
 
   /**
    * Validate a SaaSquatch webhook
+   *
    * @return optional error message
    */
   @Nullable
   public String validateSquatchWebhook(String sigHeader, byte[] bodyBytes) {
-    if (StringUtils.isBlank(sigHeader)) return "signature missing";
+    if (StringUtils.isBlank(sigHeader)) {
+      return "signature missing";
+    }
     final String jwtStr = StringUtils.replaceOnce(sigHeader, "..",
         '.' + Base64.getUrlEncoder().withoutPadding().encodeToString(bodyBytes) + '.');
     final SignedJWT signedJWT;
@@ -173,12 +178,13 @@ public class EISquatchAuth {
 
   public CompletionStage<JWK> loadJwkForSquatchJwks(String kid) {
     final String protocol = https ? "https://" : "http://";
-    final SimpleHttpRequest request = SimpleHttpRequests.get(protocol + getAppDomain()
-        + "/.well-known/jwks.json");
-    request.setConfig(RequestConfig.custom()
-        .setConnectTimeout(2500, TimeUnit.MILLISECONDS)
-        .setResponseTimeout(5, TimeUnit.SECONDS)
-        .build());
+    final SimpleHttpRequest request = SimpleRequestBuilder.get(
+            protocol + getAppDomain() + "/.well-known/jwks.json")
+        .setRequestConfig(RequestConfig.custom()
+            .setConnectionRequestTimeout(2500, TimeUnit.MILLISECONDS)
+            .setResponseTimeout(5, TimeUnit.SECONDS)
+            .build())
+        .build();
     final CompletableFuture<SimpleHttpResponse> cf = new CompletableFuture<>();
     ioBundle.getHttpAsyncClient().execute(request, EIApacheHcUtil.completableFuture(cf));
     return cf.thenApplyAsync(resp -> {
@@ -205,12 +211,12 @@ public class EISquatchAuth {
     try {
       final HttpPost request = new HttpPost(jwtTokenUrl);
       request.setConfig(RequestConfig.custom()
-          .setConnectTimeout(3, TimeUnit.SECONDS)
+          .setConnectionRequestTimeout(3, TimeUnit.SECONDS)
           .setResponseTimeout(5, TimeUnit.SECONDS)
           .build());
       request.setEntity(new ByteArrayEntity(EIJson.mapper().writeValueAsBytes(bodyJson),
           ContentType.APPLICATION_JSON));
-      try (CloseableHttpResponse resp = ioBundle.getHttpClient().execute(request)) {
+      return ioBundle.getHttpClient().execute(request, resp -> {
         final int status = resp.getCode();
         final String respBody = EntityUtils.toString(resp.getEntity(), UTF_8);
         if (status >= 300) {
@@ -224,9 +230,7 @@ public class EISquatchAuth {
           throw new RuntimeException("access_token is blank");
         }
         return accessToken;
-      } catch (org.apache.hc.core5.http.ParseException e) {
-        throw new RuntimeException(e);
-      }
+      });
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -241,11 +245,12 @@ public class EISquatchAuth {
   }
 
   public CompletionStage<JsonNode> loadIntegration(String tenantAlias) {
-    final String url = String.format("https://%s/api/v1/%s/integration/%s",
+    final String url = String.format(Locale.ROOT, "https://%s/api/v1/%s/integration/%s",
         getAppDomain(), tenantAlias, RSUrlCodec.encode(getClientId()));
-    final SimpleHttpRequest request = SimpleHttpRequests.get(url);
-    request.setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING);
-    request.setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader());
+    final SimpleHttpRequest request = SimpleRequestBuilder.get(url)
+        .setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING)
+        .setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader())
+        .build();
     final CompletableFuture<SimpleHttpResponse> respPromise = new CompletableFuture<>();
     ioBundle.getHttpAsyncClient().execute(request,
         EIApacheHcUtil.completableFuture(respPromise));
@@ -259,8 +264,9 @@ public class EISquatchAuth {
           respJson = null;
         } else {
           final String respBody = EIApacheHcUtil.getBodyText(resp);
-          throw new RuntimeException(String.format("status[%s] received from [%s]. Response: %s",
-              status, request.getUri(), respBody));
+          throw new RuntimeException(
+              String.format(Locale.ROOT, "status[%s] received from [%s]. Response: %s",
+                  status, request.getUri(), respBody));
         }
       } catch (IOException e) {
         throw new UncheckedIOException(e);
@@ -282,10 +288,12 @@ public class EISquatchAuth {
   public CompletionStage<JsonNode> getCachedIntegrationConfig(String tenantAlias) {
     return getCachedIntegration(tenantAlias)
         .thenApplyAsync(integration -> {
-          if (integration == null)
+          if (integration == null) {
             return null;
-          if (!integration.path("enabled").asBoolean(false))
+          }
+          if (!integration.path("enabled").asBoolean(false)) {
             return null;
+          }
           return integration.get("config");
         }, executor).thenApplyAsync(integration -> {
           return Optional.ofNullable(integration)
@@ -300,7 +308,7 @@ public class EISquatchAuth {
         .thenComposeAsync(integration -> {
           if (integration == null) {
             throw new IllegalStateException(
-                String.format("Tenant[%s] does not have an integration", tenantAlias));
+                String.format(Locale.ROOT, "Tenant[%s] does not have an integration", tenantAlias));
           }
           final JsonNode originalConfig = Optional.ofNullable(integration.get("config"))
               .orElseGet(JsonNodeFactory.instance::objectNode);
@@ -311,16 +319,18 @@ public class EISquatchAuth {
             throw new UncheckedIOException(e);
           }
           integration.set("config", updatedConfig);
-          final SimpleHttpRequest putReq = SimpleHttpRequests.put(String.format(
-              "https://%s/api/v1/%s/integration",  getAppDomain(), tenantAlias));
-          putReq.setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING);
-          putReq.setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader());
+          final byte[] bodyBytes;
           try {
-            putReq.setBody(EIJson.mapper().writeValueAsBytes(integration),
-                ContentType.APPLICATION_JSON);
+            bodyBytes = EIJson.mapper().writeValueAsBytes(integration);
           } catch (IOException e) {
             throw new UncheckedIOException(e);
           }
+          final SimpleHttpRequest putReq = SimpleRequestBuilder.put(String.format(
+                  Locale.ROOT, "https://%s/api/v1/%s/integration", getAppDomain(), tenantAlias))
+              .setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING)
+              .setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader())
+              .setBody(bodyBytes, ContentType.APPLICATION_JSON)
+              .build();
           final CompletableFuture<SimpleHttpResponse> respPromise = new CompletableFuture<>();
           ioBundle.getHttpAsyncClient().execute(putReq,
               EIApacheHcUtil.completableFuture(respPromise));
@@ -358,15 +368,18 @@ public class EISquatchAuth {
     if (EIJson.nonEmpty(variables)) {
       reqJson.set("variables", variables);
     }
-    final SimpleHttpRequest gqlReq = SimpleHttpRequests.post(String.format(
-        "https://%s/api/v1/%s/graphql", getAppDomain(), tenantAlias));
-    gqlReq.setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING);
-    gqlReq.setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader());
+    final byte[] bodyBytes;
     try {
-      gqlReq.setBody(EIJson.mapper().writeValueAsBytes(reqJson), ContentType.APPLICATION_JSON);
+      bodyBytes = EIJson.mapper().writeValueAsBytes(reqJson);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+    final SimpleHttpRequest gqlReq = SimpleRequestBuilder.post(String.format(
+            Locale.ROOT, "https://%s/api/v1/%s/graphql", getAppDomain(), tenantAlias))
+        .setHeader(HttpHeaders.ACCEPT_ENCODING, EIApacheHcUtil.DEFAULT_ACCEPT_ENCODING)
+        .setHeader(HttpHeaders.AUTHORIZATION, getAuthHeader())
+        .setBody(bodyBytes, ContentType.APPLICATION_JSON)
+        .build();
     final CompletableFuture<SimpleHttpResponse> respPromise = new CompletableFuture<>();
     ioBundle.getHttpAsyncClient().execute(gqlReq, EIApacheHcUtil.completableFuture(respPromise));
     return respPromise.thenApplyAsync(resp -> {
@@ -375,10 +388,11 @@ public class EISquatchAuth {
         String bodyText = "";
         try {
           bodyText = EIApacheHcUtil.getBodyText(resp);
-        } catch (IOException e) {}
-        throw new IllegalStateException(
-            String.format("Status[%s] received for GraphQL request for tenant[%s]. Body: %s",
-                status, tenantAlias, bodyText));
+        } catch (IOException e) {
+        }
+        throw new IllegalStateException(String.format(Locale.ROOT,
+            "Status[%s] received for GraphQL request for tenant[%s]. Body: %s",
+            status, tenantAlias, bodyText));
       }
       try {
         return EIJson.mapper().readValue(EIApacheHcUtil.getBodyBytes(resp),
