@@ -1,0 +1,39 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'saasquatch'
+version = '1.0-SNAPSHOT'
+
+tasks.compileJava.options.encoding = 'UTF-8'
+tasks.compileTestJava.options.encoding = 'UTF-8'
+tasks.javadoc.options.encoding = 'UTF-8'
+
+repositories {
+    mavenCentral()
+    maven { url = uri('https://jitpack.io') }
+}
+
+dependencies {
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+    api 'com.github.saasquatch:squatch-common:0.1.0-alpha-2'
+    api 'org.apache.commons:commons-lang3:3.12.0'
+    api 'com.google.guava:guava:33.0.0-jre'
+    api 'com.github.ben-manes.caffeine:caffeine:2.9.3'
+    api 'com.fasterxml.jackson.core:jackson-databind:2.16.1'
+    api 'com.fasterxml.jackson.core:jackson-core:2.16.1'
+    api 'com.fasterxml.jackson.core:jackson-annotations:2.16.1'
+    api 'com.nimbusds:nimbus-jose-jwt:9.37.3'
+    api 'org.apache.httpcomponents.client5:httpclient5:5.3'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }
+}
