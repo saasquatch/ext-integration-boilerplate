@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collector;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -29,6 +30,15 @@ public final class EIJson {
     final ObjectMapper mapper = new ObjectMapper(JsonFactory.builder()
         .disable(JsonFactory.Feature.USE_THREAD_LOCAL_FOR_BUFFER_RECYCLING).build());
     return mapper;
+  }
+
+  public static <T extends JsonNode> Collector<T, ?, ArrayNode> toArrayNode() {
+    return Collector.of(JsonNodeFactory.instance::arrayNode,
+        ArrayNode::add,
+        (a1, a2) -> {
+          a1.addAll(a2);
+          return a1;
+        });
   }
 
   public static boolean isNull(@Nullable JsonNode j) {
