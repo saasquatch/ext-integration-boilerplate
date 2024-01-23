@@ -220,7 +220,7 @@ public class EISquatchAuth {
         final int status = resp.getCode();
         final String respBody = EntityUtils.toString(resp.getEntity(), UTF_8);
         if (status >= 300) {
-          throw new IllegalStateException(String.format(
+          throw new IllegalStateException(String.format(Locale.ROOT,
               "status[%s] received from [%s]. Response body: %s",
               status, jwtTokenUrl, respBody));
         }
@@ -345,7 +345,7 @@ public class EISquatchAuth {
             } catch (IOException e) {
               throw new UncheckedIOException(e);
             }
-            throw new RuntimeException(String.format(
+            throw new RuntimeException(String.format(Locale.ROOT,
                 "status[%s] received when updating integration. Response: %s",
                 status, respBody));
           }
